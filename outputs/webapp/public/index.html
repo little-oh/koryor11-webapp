@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>KY11 Webapp</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <div>
+          <p class="eyebrow">KY11 Converter</p>
+          <h1>แปลงรายงาน ข.ย.11 บน Chrome</h1>
+          <p class="lede">
+            วางไฟล์รายงานต้นฉบับได้ครั้งละสูงสุด 10 ไฟล์ แล้วเลือก customer list ที่เก็บไว้ในเว็บได้หลายชุดพร้อมกัน
+          </p>
+        </div>
+        <div class="pill">Browser only</div>
+      </section>
+
+      <section class="panel">
+        <div id="dropzone" class="dropzone">
+          <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" multiple />
+          <p><strong>Drag & drop</strong> ไฟล์ Excel หรือ CSV ตรงนี้</p>
+          <p>รองรับสูงสุด 10 ไฟล์ต่อรอบ</p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="section-head">
+          <div>
+            <h2>Customer list ในเว็บ</h2>
+            <p class="hint">
+              ใช้ไฟล์ Excel ได้ โดยให้รายชื่ออยู่ในชีทแรก คอลัมน์แรก ชื่อไฟล์และชื่อชีทตั้งอะไรก็ได้
+            </p>
+          </div>
+          <button id="refreshCustomersBtn" type="button" class="ghost-button">รีเฟรช</button>
+        </div>
+        <div id="customerSlots" class="slots"></div>
+      </section>
+
+      <section class="panel">
+        <div class="section-head">
+          <h2>ไฟล์ที่เลือก</h2>
+        </div>
+        <ul id="fileList" class="list"></ul>
+      </section>
+
+      <section class="panel">
+        <div class="section-head">
+          <h2>ผลลัพธ์</h2>
+        </div>
+        <div id="status" class="status">รอเลือกไฟล์</div>
+        <div id="results" class="results"></div>
+        <button id="convertBtn" type="button" class="primary-action">แปลงไฟล์</button>
+      </section>
+    </main>
+    <script src="./app.js" type="module"></script>
+  </body>
+</html>
