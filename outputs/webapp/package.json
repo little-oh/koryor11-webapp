@@ -2,6 +2,9 @@
   "name": "ky11-webapp",
   "private": true,
   "type": "module",
+  "dependencies": {
+    "exceljs": "^4.4.0"
+  },
   "scripts": {
     "start": "node server.mjs"
   },
