@@ -2,7 +2,7 @@ services:
   - type: web
     name: ky11-webapp
     env: node
-    rootDir: outputs/webapp
+    rootDir: outputs
     buildCommand: npm install
     startCommand: npm start
     plan: free

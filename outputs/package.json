@@ -1,0 +1,14 @@
+{
+  "name": "koryor11-webapp-root",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "exceljs": "^4.4.0"
+  },
+  "scripts": {
+    "start": "node webapp/server.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
