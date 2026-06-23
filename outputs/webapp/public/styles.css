@@ -14,10 +14,17 @@ h2 { margin: 0; font-size: 20px; }
 .pill { padding: 10px 14px; border-radius: 999px; background: #10203a; color: #fff; font-size: 14px; }
 .panel { background: rgba(255,255,255,.85); border: 1px solid rgba(16,32,58,.12); border-radius: 16px; padding: 18px; margin-top: 16px; box-shadow: 0 12px 32px rgba(16,32,58,.06); }
 .dropzone {
-  border: 2px dashed #8aa2ff; border-radius: 16px; padding: 28px; text-align: center; background: #fbfcff;
+  border: 2px dashed #8aa2ff;
+  border-radius: 16px;
+  padding: 28px;
+  text-align: center;
+  background: #fbfcff;
+  display: grid;
+  gap: 10px;
+  justify-items: center;
 }
 .dropzone.dragover { background: #eef4ff; border-color: #3657d6; }
-.dropzone input { display: block; margin: 0 auto 12px; pointer-events: none; }
+.hidden-file-input { display: none; }
 .section-head {
   display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 12px;
 }

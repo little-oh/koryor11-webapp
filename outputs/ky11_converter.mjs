@@ -1,4 +1,4 @@
-import fs from "node:fs/promises";
+﻿import fs from "node:fs/promises";
 import path from "node:path";
 import ExcelJS from "exceljs";
 
@@ -46,10 +46,26 @@ function formatDateForFile(date = new Date()) {
   return date.toISOString().slice(0, 10);
 }
 
+function normalizeStoreName(raw) {
+  const text = cellText(raw);
+  if (!text) return "";
+  if (text === "ร้านยาพหล(Maruay Pharmacy)") return "ร้านยามารวย(Maruay Pharmacy)";
+  return text;
+}
+
+function pharmacyCodeFromRecords(records) {
+  const storeName = normalizeStoreName(records[0]?.storeName || "");
+  if (/Maruay Pharmacy/i.test(storeName)) return "MR";
+  if (/Phahol Pharmacy/i.test(storeName)) return "PH";
+  return "";
+}
+
 function buildOutputFileName(records, printDate = new Date()) {
   const firstRange = records[0]?.dateRange?.label || "";
   const rangeText = firstRange ? firstRange.replace(/^ระหว่างวันที่\s*/u, "") : "unknown-range";
-  return `รายงาน ขย 11 ${rangeText} print date ${formatDateForFile(printDate)}.xlsx`;
+  const pharmacyCode = pharmacyCodeFromRecords(records);
+  const pharmacyPart = pharmacyCode ? ` ${pharmacyCode}` : "";
+  return `รายงาน ขย 11${pharmacyPart} ${rangeText} print date ${formatDateForFile(printDate)}.xlsx`;
 }
 
 function resolveOutputPath(outputPath, records) {
@@ -94,7 +110,7 @@ function parseTable(worksheet) {
 
   return {
     sourceSheet: worksheet.name,
-    storeName: cellText(rows[2]?.[2]),
+    storeName: normalizeStoreName(rows[2]?.[2]),
     dateRange,
     drugName: cleanDrugName(rows[4]?.[2]),
     manufacturer: cellText(rows[5]?.[2]),
@@ -750,3 +766,4 @@ async function convert(inputPath, outputPath, config = {}) {
 }
 
 export { convert, loadCustomerNames, loadCustomerNamesDetailed };
+

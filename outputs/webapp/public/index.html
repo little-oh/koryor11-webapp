@@ -20,10 +20,11 @@
       </section>
 
       <section class="panel">
-        <div id="dropzone" class="dropzone">
-          <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" multiple />
+        <div id="dropzone" class="dropzone" tabindex="0">
+          <input id="fileInput" class="hidden-file-input" type="file" accept=".xlsx,.xls,.csv" multiple />
           <p><strong>Drag & drop</strong> ไฟล์ Excel หรือ CSV ตรงนี้</p>
           <p>รองรับสูงสุด 10 ไฟล์ต่อรอบ</p>
+          <button id="browseBtn" type="button" class="ghost-button">เลือกไฟล์</button>
         </div>
       </section>
 

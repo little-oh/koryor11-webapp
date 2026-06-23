@@ -1,4 +1,5 @@
 const fileInput = document.querySelector("#fileInput");
+const browseBtn = document.querySelector("#browseBtn");
 const convertBtn = document.querySelector("#convertBtn");
 const dropzone = document.querySelector("#dropzone");
 const fileList = document.querySelector("#fileList");
@@ -48,7 +49,9 @@ function renderFiles() {
 }
 
 function setFiles(files) {
-  selectedFiles = Array.from(files || []).slice(0, MAX_UPLOADS);
+  selectedFiles = Array.from(files || [])
+    .filter((file) => file && file.name)
+    .slice(0, MAX_UPLOADS);
   renderFiles();
 }
 
@@ -177,44 +180,51 @@ async function deleteCustomerSlot(slotId) {
   setStatus("ลบ customer list เรียบร้อย");
 }
 
-function preventWindowDrop(event) {
+function preventGlobalDrop(event) {
   event.preventDefault();
-  event.stopPropagation();
 }
 
 ["dragenter", "dragover", "dragleave", "drop"].forEach((eventName) => {
-  window.addEventListener(eventName, preventWindowDrop, true);
-  document.addEventListener(eventName, preventWindowDrop, true);
+  document.addEventListener(eventName, preventGlobalDrop);
+  window.addEventListener(eventName, preventGlobalDrop);
 });
 
 dropzone.addEventListener("dragenter", (event) => {
   event.preventDefault();
-  event.stopPropagation();
   dropzone.classList.add("dragover");
 });
 
 dropzone.addEventListener("dragover", (event) => {
   event.preventDefault();
-  event.stopPropagation();
+  event.dataTransfer.dropEffect = "copy";
   dropzone.classList.add("dragover");
 });
 
 dropzone.addEventListener("dragleave", (event) => {
   event.preventDefault();
-  event.stopPropagation();
-  if (event.relatedTarget && dropzone.contains(event.relatedTarget)) return;
+  if (event.currentTarget.contains(event.relatedTarget)) return;
   dropzone.classList.remove("dragover");
 });
 
 dropzone.addEventListener("drop", (event) => {
   event.preventDefault();
-  event.stopPropagation();
   dropzone.classList.remove("dragover");
-  const files = event.dataTransfer?.files || [];
-  if (files.length) setFiles(files);
+  const files = event.dataTransfer?.files;
+  if (files?.length) setFiles(files);
 });
 
-dropzone.addEventListener("click", () => fileInput.click());
+browseBtn.addEventListener("click", () => fileInput.click());
+dropzone.addEventListener("click", (event) => {
+  if (event.target === browseBtn) return;
+  fileInput.click();
+});
+dropzone.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    fileInput.click();
+  }
+});
+
 fileInput.addEventListener("change", () => setFiles(fileInput.files));
 
 refreshCustomersBtn.addEventListener("click", async () => {
