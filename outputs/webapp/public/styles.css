@@ -17,7 +17,7 @@ h2 { margin: 0; font-size: 20px; }
   border: 2px dashed #8aa2ff; border-radius: 16px; padding: 28px; text-align: center; background: #fbfcff;
 }
 .dropzone.dragover { background: #eef4ff; border-color: #3657d6; }
-.dropzone input { display: block; margin: 0 auto 12px; }
+.dropzone input { display: block; margin: 0 auto 12px; pointer-events: none; }
 .section-head {
   display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 12px;
 }

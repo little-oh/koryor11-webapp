@@ -179,25 +179,39 @@ async function deleteCustomerSlot(slotId) {
 
 function preventWindowDrop(event) {
   event.preventDefault();
+  event.stopPropagation();
 }
 
 ["dragenter", "dragover", "dragleave", "drop"].forEach((eventName) => {
-  window.addEventListener(eventName, preventWindowDrop);
+  window.addEventListener(eventName, preventWindowDrop, true);
+  document.addEventListener(eventName, preventWindowDrop, true);
+});
+
+dropzone.addEventListener("dragenter", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  dropzone.classList.add("dragover");
 });
 
 dropzone.addEventListener("dragover", (event) => {
   event.preventDefault();
+  event.stopPropagation();
   dropzone.classList.add("dragover");
 });
 
-dropzone.addEventListener("dragleave", () => {
+dropzone.addEventListener("dragleave", (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  if (event.relatedTarget && dropzone.contains(event.relatedTarget)) return;
   dropzone.classList.remove("dragover");
 });
 
 dropzone.addEventListener("drop", (event) => {
   event.preventDefault();
+  event.stopPropagation();
   dropzone.classList.remove("dragover");
-  setFiles(event.dataTransfer.files);
+  const files = event.dataTransfer?.files || [];
+  if (files.length) setFiles(files);
 });
 
 dropzone.addEventListener("click", () => fileInput.click());

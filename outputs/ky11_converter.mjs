@@ -399,16 +399,39 @@ function buildSplitSummaryLines(record) {
       items.set(key, {
         sourceNo,
         originalQty: sale.splitFromQty,
+        saleNos: [],
       });
     }
+    items.get(key).saleNos.push(sale.no);
   }
+
+  function formatSaleNoList(saleNos) {
+    const sorted = [...saleNos].sort((a, b) => a - b);
+    if (!sorted.length) return "";
+    const ranges = [];
+    let start = sorted[0];
+    let previous = sorted[0];
+    for (let i = 1; i < sorted.length; i += 1) {
+      const current = sorted[i];
+      if (current === previous + 1) {
+        previous = current;
+        continue;
+      }
+      ranges.push(start === previous ? `${start}` : `${start}-${previous}`);
+      start = current;
+      previous = current;
+    }
+    ranges.push(start === previous ? `${start}` : `${start}-${previous}`);
+    return ranges.join(", ");
+  }
+
   return [...items.values()]
-    .sort((a, b) => a.sourceNo - b.sourceNo)
-    .map((item) => `รายการที่ ${item.sourceNo} โอนย้ายสินค้าแยกจากรายการเดิม ${item.originalQty}`);
+    .sort((a, b) => a.saleNos[0] - b.saleNos[0])
+    .map((item) => `รายการที่ ${formatSaleNoList(item.saleNos)} โอนย้ายสินค้าแยกจากรายการเดิม ${item.originalQty}`);
 }
 
 function saleNoteText(sale, config) {
-  return cellText(sale.note) || config.blankNoteText;
+  return "";
 }
 
 function applyBorder(cell, style = "thin", color = "000000") {
