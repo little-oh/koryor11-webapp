@@ -41,7 +41,7 @@ function setFiles(files) {
 
 function customerSummary(slot) {
   const name = slot.label || slot.originalFileName || slot.fileName || slot.id;
-  return `${name} · ${slot.nameCount || 0} names`;
+  return `${name} · ${slot.nameCount || 0} unique usable names`;
 }
 
 function renderCustomerSlots() {
@@ -103,7 +103,9 @@ function renderCustomerSlots() {
 
     const meta = document.createElement("div");
     meta.className = "slot-meta";
-    meta.textContent = slot.fileName ? `ไฟล์: ${slot.fileName}` : "ยังไม่ได้อัปโหลดไฟล์";
+    meta.textContent = slot.fileName
+      ? `ไฟล์: ${slot.fileName}${slot.detectedColumnLabel ? ` · อ่านจากคอลัมน์ ${slot.detectedColumnLabel}` : ""}${slot.usableCount ? ` · พบชื่อที่ใช้ได้ ${slot.usableCount} แถว` : ""}`
+      : "ยังไม่ได้อัปโหลดไฟล์";
 
     card.append(top, meta);
     customerSlotsEl.appendChild(card);
@@ -125,6 +127,8 @@ async function loadCustomerSlots() {
       fileName: stored?.fileName || "",
       originalFileName: stored?.originalFileName || "",
       nameCount: stored?.nameCount || 0,
+      usableCount: stored?.usableCount || 0,
+      detectedColumnLabel: stored?.detectedColumnLabel || "",
       selected: stored ? existingSelection.get(id) ?? true : false,
     };
   });

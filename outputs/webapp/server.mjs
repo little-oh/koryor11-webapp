@@ -119,7 +119,8 @@ async function handleCustomerListPost(req, res) {
   if (!file?.base64 || !file?.name) return sendJson(res, 400, { error: "Missing file" });
 
   const tempPath = await saveBase64ToFile(RUNS_DIR, `customer-${slotId}-${safeName(file.name)}`, file.base64);
-  const names = await converter.loadCustomerNames(tempPath);
+  const detailed = await converter.loadCustomerNamesDetailed(tempPath);
+  const names = detailed.names;
   const slots = await readCustomerDb();
   const nextSlot = {
     id: slotId,
@@ -128,6 +129,10 @@ async function handleCustomerListPost(req, res) {
     originalFileName: file.name,
     names,
     nameCount: names.length,
+    usableCount: detailed.stats?.usableCount || names.length,
+    detectedSheetName: detailed.stats?.sheetName || "",
+    detectedColumnLabel: detailed.stats?.columnLabel || "A",
+    sampleNames: Array.isArray(detailed.stats?.sampleNames) ? detailed.stats.sampleNames : [],
     updatedAt: new Date().toISOString(),
   };
   const nextSlots = slots.filter((slot) => normalizeSlotId(slot.id) !== slotId);

@@ -262,6 +262,55 @@ function collectNamesFromRows(rows, columnIndex = 1) {
   return [...new Set(names)];
 }
 
+function excelColumnName(columnNumber) {
+  let n = columnNumber;
+  let result = "";
+  while (n > 0) {
+    const remainder = (n - 1) % 26;
+    result = String.fromCharCode(65 + remainder) + result;
+    n = Math.floor((n - 1) / 26);
+  }
+  return result || "A";
+}
+
+function findBestNameColumn(rows, startColumn = 0, maxColumns = 10) {
+  let best = {
+    columnIndex: startColumn,
+    usableCount: 0,
+    uniqueCount: 0,
+    sampleNames: [],
+  };
+
+  for (let columnIndex = startColumn; columnIndex < startColumn + maxColumns; columnIndex += 1) {
+    const usableNames = [];
+    const uniqueNames = new Set();
+
+    for (const row of rows) {
+      const value = row?.[columnIndex];
+      if (!looksLikePersonName(value)) continue;
+      const text = cellText(value);
+      usableNames.push(text);
+      uniqueNames.add(text);
+    }
+
+    const candidate = {
+      columnIndex,
+      usableCount: usableNames.length,
+      uniqueCount: uniqueNames.size,
+      sampleNames: [...uniqueNames].slice(0, 5),
+    };
+
+    if (
+      candidate.uniqueCount > best.uniqueCount ||
+      (candidate.uniqueCount === best.uniqueCount && candidate.usableCount > best.usableCount)
+    ) {
+      best = candidate;
+    }
+  }
+
+  return best;
+}
+
 async function loadCustomerNamesFromCsv(customerPath) {
   const bytes = await fs.readFile(customerPath);
   const text = new TextDecoder("utf-8").decode(bytes).replace(/^\uFEFF/, "");
@@ -269,12 +318,25 @@ async function loadCustomerNamesFromCsv(customerPath) {
     .split(/\r?\n/)
     .map(parseCsvLine)
     .filter((row) => row.some(Boolean));
-  return collectNamesFromRows(rows, 0);
+  const bestColumn = findBestNameColumn(rows, 0, Math.min(10, Math.max(1, rows[0]?.length || 1)));
+  return {
+    names: collectNamesFromRows(rows, bestColumn.columnIndex),
+    stats: {
+      sheetName: "CSV",
+      columnLabel: excelColumnName(bestColumn.columnIndex + 1),
+      usableCount: bestColumn.usableCount,
+      uniqueCount: bestColumn.uniqueCount,
+      sampleNames: bestColumn.sampleNames,
+    },
+  };
 }
 
 async function loadCustomerNames(customerPath) {
   if (!customerPath) return [];
-  if (customerPath.toLowerCase().endsWith(".csv")) return loadCustomerNamesFromCsv(customerPath);
+  if (customerPath.toLowerCase().endsWith(".csv")) {
+    const result = await loadCustomerNamesFromCsv(customerPath);
+    return result.names;
+  }
 
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.readFile(customerPath);
@@ -284,9 +346,56 @@ async function loadCustomerNames(customerPath) {
   const rows = [];
   for (let r = 1; r <= worksheet.rowCount; r += 1) {
     const row = worksheet.getRow(r);
-    rows.push([null, row.getCell(1).value]);
+    const values = [];
+    for (let c = 1; c <= Math.min(10, Math.max(1, row.cellCount)); c += 1) {
+      values[c] = row.getCell(c).value;
+    }
+    rows.push(values);
   }
-  return collectNamesFromRows(rows, 1);
+  const bestColumn = findBestNameColumn(rows, 1, 10);
+  return collectNamesFromRows(rows, bestColumn.columnIndex);
+}
+
+async function loadCustomerNamesDetailed(customerPath) {
+  if (!customerPath) {
+    return {
+      names: [],
+      stats: { sheetName: "", columnLabel: "A", usableCount: 0, uniqueCount: 0, sampleNames: [] },
+    };
+  }
+  if (customerPath.toLowerCase().endsWith(".csv")) return loadCustomerNamesFromCsv(customerPath);
+
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.readFile(customerPath);
+  const worksheet = workbook.worksheets[0];
+  if (!worksheet) {
+    return {
+      names: [],
+      stats: { sheetName: "", columnLabel: "A", usableCount: 0, uniqueCount: 0, sampleNames: [] },
+    };
+  }
+
+  const rows = [];
+  for (let r = 1; r <= worksheet.rowCount; r += 1) {
+    const row = worksheet.getRow(r);
+    const values = [];
+    for (let c = 1; c <= Math.min(10, Math.max(1, row.cellCount)); c += 1) {
+      values[c] = row.getCell(c).value;
+    }
+    rows.push(values);
+  }
+
+  const bestColumn = findBestNameColumn(rows, 1, 10);
+  return {
+    names: collectNamesFromRows(rows, bestColumn.columnIndex),
+    stats: {
+      sheetName: worksheet.name,
+      columnLabel: excelColumnName(bestColumn.columnIndex),
+      usableCount: bestColumn.usableCount,
+      uniqueCount: bestColumn.uniqueCount,
+      sampleNames: bestColumn.sampleNames,
+    },
+  };
 }
 
 function applyBorder(cell, style = "thin", color = "000000") {
@@ -589,5 +698,4 @@ async function convert(inputPath, outputPath, config = {}) {
   return { records, recordIssues, outputPath: resolvedOutputPath };
 }
 
-export { convert, loadCustomerNames };
-
+export { convert, loadCustomerNames, loadCustomerNamesDetailed };
