@@ -155,14 +155,14 @@ function formatQuantity(amount, unit) {
   return `${displayAmount}${unit ? ` ${unit}` : ""}`.trim();
 }
 
-function saleNoteText(sale, config) {
+function saleNoteTextV2(sale, config) {
   const notes = [];
   if (cellText(sale.note)) notes.push(cellText(sale.note));
   if (sale.splitFromQty) notes.push(`แยกจากรายการเดิม ${sale.splitFromQty} (${sale.splitPart}/${sale.splitTotal})`);
   return notes.join("; ") || config.blankNoteText;
 }
 
-function splitOversizedSales(records, config) {
+function splitOversizedSalesV2(records, config) {
   const maxQty = Number(config.maxQtyPerSale) || 2;
   if (maxQty <= 0) return;
   for (const record of records) {
@@ -669,14 +669,248 @@ function writeIssueDetails(worksheet, records, recordIssues) {
   }
 }
 
+function saleNoteText(sale, config) {
+  const notes = [];
+  if (cellText(sale.note)) notes.push(cellText(sale.note));
+  return notes.join("; ") || config.blankNoteText;
+}
+
+function splitOversizedSales(records, config) {
+  const maxQty = Number(config.maxQtyPerSale) || 2;
+  if (maxQty <= 0) return;
+  for (const record of records) {
+    const splitSales = [];
+    for (const sale of record.sales) {
+      const parsed = parseQuantityText(sale.qty);
+      if (!parsed || parsed.amount <= maxQty) {
+        splitSales.push(sale);
+        continue;
+      }
+
+      let remaining = parsed.amount;
+      let splitPart = 1;
+      const seed = `${record.drugName}|${sale.saleDate}|${sale.qty}|${sale.no}`;
+      const parts = [];
+      let seedStep = 0;
+      while (remaining > 0) {
+        const canUseTwo = remaining > 1;
+        const shouldUseTwo = canUseTwo && seededIndex(`${seed}|${seedStep}`, 2) === 0;
+        const partAmount = shouldUseTwo ? 2 : 1;
+        parts.push(partAmount);
+        remaining -= partAmount;
+        seedStep += 1;
+      }
+
+      const splitTotal = parts.length;
+      for (const partAmount of parts) {
+        splitSales.push({
+          ...sale,
+          no: splitSales.length + 1,
+          qty: formatQuantity(partAmount, parsed.unit),
+          sourceNo: sale.sourceNo ?? sale.no,
+          splitFromQty: sale.qty,
+          splitPart,
+          splitTotal,
+        });
+        splitPart += 1;
+      }
+    }
+    record.sales = splitSales.map((sale, index) => ({ ...sale, no: index + 1 }));
+  }
+}
+
+function ensureNoAdjacentDuplicateBuyersV2(records, config) {
+  if (!config.customerNames?.length) return;
+  for (const record of records) {
+    let previousBuyer = "";
+    for (const sale of record.sales) {
+      const buyer = cellText(sale.buyer);
+      if (!buyer) continue;
+      if (buyer !== previousBuyer) {
+        previousBuyer = buyer;
+        continue;
+      }
+      const candidates = config.customerNames.filter((name) => cellText(name) && cellText(name) !== previousBuyer);
+      if (!candidates.length) continue;
+      const seed = `${record.drugName}|${sale.saleDate}|${sale.qty}|${sale.no}|adjacent-buyer`;
+      sale.buyer = candidates[seededIndex(seed, candidates.length)];
+      sale.demoGeneratedBuyer = true;
+      previousBuyer = cellText(sale.buyer);
+    }
+  }
+}
+
+function buildSplitSummaryLinesV2(record) {
+  const grouped = new Map();
+  for (const sale of record.sales) {
+    if (!sale.splitFromQty) continue;
+    const key = `${sale.sourceNo ?? sale.no}|${sale.splitFromQty}`;
+    if (!grouped.has(key)) {
+      grouped.set(key, {
+        sourceNo: sale.sourceNo ?? sale.no,
+        originalQty: sale.splitFromQty,
+      });
+    }
+  }
+  return [...grouped.values()]
+    .sort((a, b) => a.sourceNo - b.sourceNo)
+    .map((item) => `รายการที่ ${item.sourceNo} โอนย้ายสินค้าแยกจากรายการเดิม ${item.originalQty}`);
+}
+
+function writeKy11SheetV2(worksheet, record, issues, config) {
+  worksheet.views = [{ showGridLines: false }];
+  worksheet.columns = [
+    { key: "A", width: 9 },
+    { key: "B", width: 16 },
+    { key: "C", width: 23 },
+    { key: "D", width: 28 },
+    { key: "E", width: 24 },
+    { key: "F", width: 18 },
+  ];
+
+  worksheet.mergeCells("A1:E1");
+  worksheet.mergeCells("A2:E2");
+  worksheet.mergeCells("A3:E3");
+  worksheet.getCell("A1").value = "บัญชีการขายยาอันตราย เฉพาะรายการยาที่เลขาธิการคณะกรรมการอาหารและยากำหนด";
+  worksheet.getCell("F1").value = "แบบ ขย.๑๑";
+  worksheet.getCell("A2").value = displayOr(record.storeName, "รอกรอกชื่อสถานที่ขายยา");
+  worksheet.getCell("A3").value = record.dateRange.label;
+  worksheet.getCell("A4").value = "ชื่อยา";
+  worksheet.getCell("B4").value = displayOr(record.drugName, "รอกรอกข้อมูล");
+  worksheet.getCell("A5").value = "ชื่อผู้ผลิต/ผู้นำเข้า";
+  worksheet.getCell("B5").value = displayOr(record.manufacturer, config.blankManufacturerText);
+  worksheet.getCell("C5").value = "เลขที่หรืออักษรของครั้งที่ผลิต";
+  worksheet.getCell("D5").value = displayOr(record.lot, config.blankLotText);
+  worksheet.getCell("E5").value = "ขนาดบรรจุ";
+  worksheet.getCell("F5").value = displayOr(record.packageSize, "รอกรอกข้อมูล");
+  worksheet.getCell("A6").value = "ได้มาจาก";
+  worksheet.getCell("B6").value = displayOr(record.source, "รอกรอกข้อมูล");
+  worksheet.getCell("C6").value = "จำนวนรับเปรียบเทียบหน่วยเล็กสุด";
+  worksheet.getCell("D6").value = displayOr(record.receivedQty, "รอกรอกข้อมูล");
+  worksheet.getCell("E6").value = "วันที่รับ";
+  worksheet.getCell("F6").value = displayOr(record.receivedDate, "รอกรอกข้อมูล");
+  worksheet.getCell("A7").value = "จำนวนคงเหลือ";
+  worksheet.getCell("B7").value = displayOr(record.remainingQty, "รอกรอกข้อมูล");
+  worksheet.getCell("A8").value = "ลำดับที่";
+  worksheet.getCell("B8").value = "วันเดือนปีที่ขาย";
+  worksheet.getCell("C8").value = "จำนวน/ปริมาณที่ขาย";
+  worksheet.getCell("D8").value = "ชื่อ - สกุล ผู้ซื้อ";
+  worksheet.getCell("E8").value = "ลายมือชื่อผู้มีหน้าที่ปฏิบัติการ";
+  worksheet.getCell("F8").value = "หมายเหตุ";
+
+  const minRows = Math.max(record.sales.length, Math.min(25, config.maxRowsPerSheet));
+  for (let i = 0; i < minRows; i += 1) {
+    const sale = record.sales[i];
+    const rowNumber = 9 + i;
+    worksheet.getCell(`A${rowNumber}`).value = i + 1;
+    if (sale) {
+      worksheet.getCell(`B${rowNumber}`).value = sale.saleDate;
+      worksheet.getCell(`C${rowNumber}`).value = sale.qty;
+      worksheet.getCell(`D${rowNumber}`).value = displayOr(sale.buyer, config.blankBuyerText);
+      worksheet.getCell(`E${rowNumber}`).value = sale.practitioner;
+      worksheet.getCell(`F${rowNumber}`).value = saleNoteTextV2(sale, config);
+    }
+  }
+
+  const headerStyle = {
+    font: { bold: true, name: "Aptos", size: 11 },
+    alignment: { horizontal: "center", vertical: "middle", wrapText: true },
+  };
+  const titleStyle = {
+    font: { bold: true, name: "Aptos", size: 12 },
+    alignment: { horizontal: "center", vertical: "middle", wrapText: true },
+  };
+  worksheet.getCell("A1").style = titleStyle;
+  worksheet.getCell("F1").style = { ...titleStyle, alignment: { horizontal: "right", vertical: "middle" } };
+  worksheet.getCell("A2").style = titleStyle;
+  worksheet.getCell("A3").style = titleStyle;
+  ["A4", "A5", "A6", "A7", "A8", "B4", "B5", "B6", "B7", "B8", "C5", "C6", "D5", "D6", "E5", "E6", "F5", "F6"]
+    .forEach((addr) => {
+      worksheet.getCell(addr).font = { name: "Aptos", size: 10, bold: true };
+    });
+  ["A4:F8"].forEach((range) => {
+    const [start, end] = range.split(":");
+    const startCol = worksheet.getCell(start).col;
+    const startRow = worksheet.getCell(start).row;
+    const endCol = worksheet.getCell(end).col;
+    const endRow = worksheet.getCell(end).row;
+    for (let r = startRow; r <= endRow; r += 1) {
+      for (let c = startCol; c <= endCol; c += 1) {
+        const cell = worksheet.getRow(r).getCell(c);
+        cell.style = { ...cell.style, ...headerStyle };
+        applyBorder(cell);
+      }
+    }
+  });
+
+  for (let r = 9; r < 9 + minRows; r += 1) {
+    for (let c = 1; c <= 6; c += 1) {
+      const cell = worksheet.getRow(r).getCell(c);
+      cell.alignment = { vertical: "top", wrapText: true };
+      applyBorder(cell);
+    }
+    worksheet.getRow(r).getCell(1).alignment = { horizontal: "center", vertical: "top" };
+    worksheet.getRow(r).getCell(2).alignment = { horizontal: "center", vertical: "top" };
+    worksheet.getRow(r).getCell(3).alignment = { horizontal: "center", vertical: "top" };
+    worksheet.getRow(r).getCell(5).alignment = { horizontal: "center", vertical: "top" };
+  }
+
+  const warningCells = [];
+  if (!record.drugName) warningCells.push("B4");
+  if (!record.manufacturer) warningCells.push("B5");
+  if (!record.lot) warningCells.push("D5");
+  if (!record.packageSize) warningCells.push("F5");
+  if (!record.source) warningCells.push("B6");
+  if (!record.receivedQty) warningCells.push("D6");
+  if (!record.receivedDate) warningCells.push("F6");
+  if (!record.remainingQty) warningCells.push("B7");
+  for (let i = 0; i < record.sales.length; i += 1) {
+    const sale = record.sales[i];
+    const rowNumber = 9 + i;
+    if (!sale.saleDate) warningCells.push(`B${rowNumber}`);
+    if (!sale.qty) warningCells.push(`C${rowNumber}`);
+    if (!sale.buyer || !looksLikePersonName(sale.buyer)) warningCells.push(`D${rowNumber}`);
+    if (!sale.practitioner) warningCells.push(`E${rowNumber}`);
+  }
+  for (const address of warningCells) {
+    worksheet.getCell(address).fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FEF3C7" },
+    };
+  }
+
+  let footerRow = 9 + minRows + 1;
+  const splitSummaryLines = buildSplitSummaryLinesV2(record);
+  for (const line of splitSummaryLines) {
+    worksheet.mergeCells(`A${footerRow}:F${footerRow}`);
+    worksheet.getCell(`A${footerRow}`).value = line;
+    worksheet.getCell(`A${footerRow}`).font = { size: 9 };
+    worksheet.getCell(`A${footerRow}`).alignment = { wrapText: true };
+    footerRow += 1;
+  }
+
+  if (issues.length) {
+    worksheet.mergeCells(`A${footerRow}:F${footerRow}`);
+    worksheet.getCell(`A${footerRow}`).value = `มี ${issues.length} จุดที่ต้องตรวจสอบ ดูรายละเอียดในชีต "รายการที่ต้องแก้"`;
+    worksheet.getCell(`A${footerRow}`).font = { color: { argb: "9A3412" }, size: 9 };
+    worksheet.getCell(`A${footerRow}`).fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FFF7ED" },
+    };
+  }
+}
+
 async function convert(inputPath, outputPath, config = {}) {
   config = { ...DEFAULT_CONFIG, ...config };
   const sourceWorkbook = new ExcelJS.Workbook();
   await sourceWorkbook.xlsx.readFile(inputPath);
 
   const records = sourceWorkbook.worksheets.map(parseTable);
-  splitOversizedSales(records, config);
+  splitOversizedSalesV2(records, config);
   applyDemoRandomBuyerNames(records, config);
+  ensureNoAdjacentDuplicateBuyersV2(records, config);
   const recordIssues = records.map((record) => issueList(record, config));
 
   const workbook = new ExcelJS.Workbook();
@@ -689,7 +923,7 @@ async function convert(inputPath, outputPath, config = {}) {
   for (let i = 0; i < records.length; i += 1) {
     const record = records[i];
     const sheet = workbook.addWorksheet(safeSheetName(record.drugName || record.sourceSheet, usedNames));
-    writeKy11Sheet(sheet, record, recordIssues[i], config);
+    writeKy11SheetV2(sheet, record, recordIssues[i], config);
   }
 
   const resolvedOutputPath = resolveOutputPath(outputPath, records);
