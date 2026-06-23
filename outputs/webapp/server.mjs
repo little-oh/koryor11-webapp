@@ -201,8 +201,12 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === "POST" && url.pathname === "/api/convert") return handleApiConvert(req, res);
     if (url.pathname.startsWith("/runs/")) {
-      const rel = url.pathname.slice("/runs/".length);
-      const filePath = path.join(RUNS_DIR, rel);
+      const rel = url.pathname
+        .slice("/runs/".length)
+        .split("/")
+        .map((segment) => decodeURIComponent(segment))
+        .join(path.sep);
+      const filePath = path.normalize(path.join(RUNS_DIR, rel));
       if (!filePath.startsWith(RUNS_DIR)) return sendText(res, 403, "Forbidden");
       try {
         const data = await fs.readFile(filePath);
