@@ -40,11 +40,26 @@ function base64ToBlob(base64, mimeType) {
 
 function renderFiles() {
   fileList.innerHTML = "";
-  for (const file of selectedFiles) {
+  selectedFiles.forEach((file, index) => {
     const li = document.createElement("li");
-    li.textContent = `${file.name} (${Math.round(file.size / 1024)} KB)`;
+    li.className = "file-row";
+
+    const name = document.createElement("div");
+    name.className = "file-name";
+    name.textContent = `${file.name} (${Math.round(file.size / 1024)} KB)`;
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "remove-file-button";
+    removeBtn.textContent = "ลบ";
+    removeBtn.addEventListener("click", () => {
+      selectedFiles = selectedFiles.filter((_, fileIndex) => fileIndex !== index);
+      renderFiles();
+    });
+
+    li.append(name, removeBtn);
     fileList.appendChild(li);
-  }
+  });
   setStatus(selectedFiles.length ? `${selectedFiles.length} ไฟล์พร้อมแปลง` : "รอเลือกไฟล์");
 }
 
