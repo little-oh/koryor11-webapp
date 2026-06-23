@@ -159,11 +159,17 @@ async function handleApiConvert(req, res) {
 
   if (!files.length) return sendJson(res, 400, { error: "No files uploaded" });
   if (files.length > MAX_FILES) return sendJson(res, 400, { error: "Upload up to 10 files at a time" });
+  if (!customerSlotIds.length) {
+    return sendJson(res, 400, { error: "Please select at least one customer list before converting" });
+  }
 
   const runId = `${Date.now()}-${randomUUID().slice(0, 8)}`;
   const runDir = path.join(RUNS_DIR, runId);
   await fs.mkdir(runDir, { recursive: true });
   const customerNames = await loadCustomerNamesFromStoredSlots(customerSlotIds);
+  if (!customerNames.length) {
+    return sendJson(res, 400, { error: "Selected customer list has no usable names" });
+  }
 
   const results = [];
   for (const file of files) {

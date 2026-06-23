@@ -48,13 +48,17 @@ function renderFiles() {
 }
 
 function setFiles(files) {
-  selectedFiles = Array.from(files).slice(0, MAX_UPLOADS);
+  selectedFiles = Array.from(files || []).slice(0, MAX_UPLOADS);
   renderFiles();
 }
 
+function selectedCustomerSlotIds() {
+  return customerSlots.filter((slot) => slot.selected && slot.nameCount > 0).map((slot) => slot.id);
+}
+
 function customerSummary(slot) {
-  const name = slot.label || slot.originalFileName || slot.fileName || slot.id;
-  return `${name} · ${slot.nameCount || 0} unique usable names`;
+  const label = slot.label || slot.originalFileName || slot.fileName || slot.id;
+  return `${label} · ${slot.nameCount || 0} unique usable names`;
 }
 
 function renderCustomerSlots() {
@@ -91,7 +95,7 @@ function renderCustomerSlots() {
 
     const upload = document.createElement("label");
     upload.className = "ghost-button";
-    upload.textContent = slot.filePendingName ? `อัปโหลด: ${slot.filePendingName}` : "อัปโหลด/แทนที่";
+    upload.textContent = "อัปโหลด/แทนที่";
     const input = document.createElement("input");
     input.type = "file";
     input.accept = ".xlsx,.xls,.csv";
@@ -173,18 +177,30 @@ async function deleteCustomerSlot(slotId) {
   setStatus("ลบ customer list เรียบร้อย");
 }
 
+function preventWindowDrop(event) {
+  event.preventDefault();
+}
+
+["dragenter", "dragover", "dragleave", "drop"].forEach((eventName) => {
+  window.addEventListener(eventName, preventWindowDrop);
+});
+
 dropzone.addEventListener("dragover", (event) => {
   event.preventDefault();
   dropzone.classList.add("dragover");
 });
 
-dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
+dropzone.addEventListener("dragleave", () => {
+  dropzone.classList.remove("dragover");
+});
+
 dropzone.addEventListener("drop", (event) => {
   event.preventDefault();
   dropzone.classList.remove("dragover");
   setFiles(event.dataTransfer.files);
 });
 
+dropzone.addEventListener("click", () => fileInput.click());
 fileInput.addEventListener("change", () => setFiles(fileInput.files));
 
 refreshCustomersBtn.addEventListener("click", async () => {
@@ -201,10 +217,20 @@ refreshCustomersBtn.addEventListener("click", async () => {
 convertBtn.addEventListener("click", async () => {
   clearDownloadObjectUrls();
   resultsEl.innerHTML = "";
+
   if (!selectedFiles.length) {
     setStatus("กรุณาเลือกไฟล์ก่อน");
     return;
   }
+
+  const customerSlotIds = selectedCustomerSlotIds();
+  if (!customerSlotIds.length) {
+    const message = "ยังไม่ได้เลือก customer list จึงแปลงไฟล์ไม่ได้";
+    setStatus(message);
+    window.alert(message);
+    return;
+  }
+
   convertBtn.disabled = true;
   setStatus("กำลังแปลงไฟล์...");
 
@@ -214,7 +240,6 @@ convertBtn.addEventListener("click", async () => {
       files.push({ name: file.name, base64: await fileToBase64(file) });
     }
 
-    const customerSlotIds = customerSlots.filter((slot) => slot.selected).map((slot) => slot.id);
     const response = await fetch("/api/convert", {
       method: "POST",
       headers: { "content-type": "application/json" },
