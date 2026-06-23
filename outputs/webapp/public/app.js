@@ -10,6 +10,7 @@ const refreshCustomersBtn = document.querySelector("#refreshCustomersBtn");
 const MAX_UPLOADS = 10;
 let selectedFiles = [];
 let customerSlots = [];
+let downloadObjectUrls = [];
 
 function fileToBase64(file) {
   return file.arrayBuffer().then((buffer) => {
@@ -22,6 +23,18 @@ function fileToBase64(file) {
 
 function setStatus(text) {
   statusEl.textContent = text;
+}
+
+function clearDownloadObjectUrls() {
+  for (const url of downloadObjectUrls) URL.revokeObjectURL(url);
+  downloadObjectUrls = [];
+}
+
+function base64ToBlob(base64, mimeType) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: mimeType });
 }
 
 function renderFiles() {
@@ -186,6 +199,7 @@ refreshCustomersBtn.addEventListener("click", async () => {
 });
 
 convertBtn.addEventListener("click", async () => {
+  clearDownloadObjectUrls();
   resultsEl.innerHTML = "";
   if (!selectedFiles.length) {
     setStatus("กรุณาเลือกไฟล์ก่อน");
@@ -213,7 +227,13 @@ convertBtn.addEventListener("click", async () => {
     for (const item of data.results) {
       const row = document.createElement("div");
       row.className = "result";
-      row.innerHTML = `<div>${item.outputName}</div><a href="${item.downloadUrl}" download>ดาวน์โหลด</a>`;
+      const blob = base64ToBlob(
+        item.outputBase64,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      );
+      const objectUrl = URL.createObjectURL(blob);
+      downloadObjectUrls.push(objectUrl);
+      row.innerHTML = `<div>${item.outputName}</div><a href="${objectUrl}" download="${item.outputName}">ดาวน์โหลด</a>`;
       resultsEl.appendChild(row);
     }
   } catch (error) {

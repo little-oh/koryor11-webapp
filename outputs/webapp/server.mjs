@@ -95,9 +95,11 @@ async function makeOutputForInput(runDir, fileName, base64, customerNames) {
     demoRandomNames: true,
     customerNames,
   });
+  const outputBytes = await fs.readFile(result.outputPath);
   return {
     inputName: fileName,
     outputName: path.basename(result.outputPath),
+    outputBase64: outputBytes.toString("base64"),
     downloadUrl: `/runs/${path.basename(runDir)}/${encodeURIComponent(path.basename(result.outputPath))}`,
   };
 }
